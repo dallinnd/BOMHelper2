@@ -61,7 +61,7 @@ footer { padding: 15px; text-align: center; border-top: 1px solid var(--border);
 #legal-link { font-size: 0.8rem; color: var(--text-light); text-decoration: none; }
 #legal-link:hover { text-decoration: underline; }
 
-/* Modal Popup - UPDATED STYLES */
+/* Modal Popup */
 .modal-overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000;
   display: flex; align-items: center; justify-content: center;
@@ -70,38 +70,38 @@ footer { padding: 15px; text-align: center; border-top: 1px solid var(--border);
 .modal-overlay.hidden { opacity: 0; pointer-events: none; }
 
 .modal-content {
-  background: white; width: 90%; max-width: 500px; height: 50vh;
+  background: white; width: 90%; max-width: 500px; height: 60vh; /* Made slightly taller */
   border-radius: 24px; display: flex; flex-direction: column;
   box-shadow: 0 20px 50px rgba(0,0,0,0.2); transform: translateY(0); transition: transform 0.3s;
 }
 .modal-overlay.hidden .modal-content { transform: translateY(20px); }
 
-/* Updated Header for Centering */
 .modal-header {
   padding: 15px 20px; border-bottom: 1px solid var(--border);
-  display: flex; justify-content: center; /* Center horizontally */
-  align-items: center; position: relative;
+  display: flex; justify-content: center; align-items: center; position: relative;
 }
-
-/* Updated Reference Title Style */
-.modal-ref { 
-  font-weight: 600; 
-  color: var(--text-light); /* Lighter Text Color */
-  font-size: 1rem; 
-  text-align: center;
-}
-
-/* Close button absolute positioning */
+.modal-ref { font-weight: 600; color: var(--text-light); font-size: 1rem; text-align: center; }
 .close-btn { 
   position: absolute; right: 15px; top: 12px;
   background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-light); 
 }
 
-/* Modal Body */
 .modal-body {
-  padding: 25px; overflow-y: auto; 
-  font-size: 1.15rem; /* Slightly larger for reading */
-  line-height: 1.6; color: var(--text);
+  padding: 25px; overflow-y: auto; flex: 1;
+  font-size: 1.15rem; line-height: 1.6; color: var(--text);
   white-space: pre-wrap;
-  text-align: left; /* Ensure text is left aligned even if title is centered */
 }
+
+/* Modal Footer (Action Buttons) */
+.modal-footer {
+  padding: 15px 20px; border-top: 1px solid var(--border);
+  display: flex; justify-content: center;
+}
+
+.action-btn {
+  background: white; border: 1px solid var(--border); color: var(--primary);
+  padding: 10px 20px; border-radius: 50px; font-size: 0.9rem; font-weight: 600;
+  cursor: pointer; transition: 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+.action-btn:hover { background: var(--bg); border-color: var(--primary); }
+.action-btn:active { transform: scale(0.96); }
