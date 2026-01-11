@@ -14,10 +14,14 @@ const modalText = document.getElementById('modal-text');
 const modalRef = document.querySelector('.modal-ref');
 const closeBtn = document.querySelector('.close-btn');
 const legalLink = document.getElementById('legal-link');
+// New Element for the button container in the modal
+const modalFooter = document.createElement('div');
+modalFooter.className = 'modal-footer';
+document.querySelector('.modal-content').appendChild(modalFooter);
 
 // --- Initialization ---
 document.addEventListener('DOMContentLoaded', async () => {
-    const savedData = localStorage.getItem('bom_data_v5'); // Bump version to v5
+    const savedData = localStorage.getItem('bom_data_v6'); // Bump to v6
     
     if (savedData) {
         try {
@@ -44,12 +48,10 @@ async function loadAndParseText() {
         if (!response.ok) throw new Error("File not found or network error.");
         const fullText = await response.text();
 
-        // 1. Split Lines & Separate Legal Text
         const allLines = fullText.split(/\r?\n/);
         legalTextContent = allLines.slice(0, 260).join('\n');
         const rawScriptureText = allLines.slice(260).join('\n');
 
-        // 2. Split by Double Newline (Paragraphs)
         const rawParagraphs = rawScriptureText.split(/\n\s*\n/);
         
         const tempWords = new Set();
@@ -57,41 +59,43 @@ async function loadAndParseText() {
 
         rawParagraphs.forEach((para, index) => {
             let cleanPara = para.trim();
-            if (cleanPara.length < 5) return; // Skip empty stuff
+            if (cleanPara.length < 5) return;
 
-            // --- SMARTER PARSING START ---
-            // We check if the FIRST line looks like a reference (e.g. "1 Nephi 3:7")
-            // This Regex looks for: Digits, Names, Digits, Colon, Digits
-            // Example match: "1 Nephi 3:7" or "Alma 30:44"
             const lines = cleanPara.split('\n');
             let reference = "";
             let textContent = cleanPara;
 
-            // If the first line is short and has a number/colon, assume it is the Header
+            // Logic to find Reference and separate it from Text
             if (lines.length > 1 && lines[0].length < 50 && /\d+[:]\d+/.test(lines[0])) {
-                reference = lines[0].trim(); // "1 Nephi 1:5"
-                // Remove the first line from the text content
+                reference = lines[0].trim(); 
                 textContent = lines.slice(1).join(' ').trim(); 
             } else {
-                // Fallback: Use the first 30 chars as the reference
                 reference = cleanPara.substring(0, 30).trim() + "...";
             }
-            // --- SMARTER PARSING END ---
+
+            // --- NEW: Generate Chapter ID ---
+            // If reference is "1 Nephi 3:7", chapterId becomes "1 Nephi 3"
+            let chapterId = "Unknown";
+            if (reference.includes(":")) {
+                chapterId = reference.split(":")[0].trim();
+            } else {
+                chapterId = reference; // Fallback
+            }
 
             allVerses.push({ 
                 id: index, 
-                ref: reference,  // Store distinct Reference
-                text: textContent // Store distinct Text
+                ref: reference,  
+                text: textContent,
+                chapterId: chapterId // Store this for the chapter view
             });
 
-            // Tokenize words from text only
             const words = textContent.toLowerCase().match(/\b[a-z]{3,}\b/g);
             if (words) words.forEach(w => tempWords.add(w));
         });
 
         uniqueWords = Array.from(tempWords).sort();
 
-        localStorage.setItem('bom_data_v5', JSON.stringify({
+        localStorage.setItem('bom_data_v6', JSON.stringify({
             verses: allVerses,
             words: uniqueWords,
             legal: legalTextContent
@@ -140,16 +144,14 @@ function performSearch(query) {
     results.forEach(verse => {
         const box = document.createElement('div');
         box.className = 'verse-box';
-        
-        // Highlight found word in the text
         const snippet = verse.text.replace(new RegExp(`(${q})`, 'gi'), '<b style="color:var(--primary);">$1</b>');
 
         box.innerHTML = `
             <span class="verse-ref">${verse.ref}</span>
             <div class="verse-snippet">${snippet}</div>
         `;
-        // Pass distinct ref and text to popup
-        box.onclick = () => openPopup(verse.ref, verse.text);
+        // Pass the whole verse object now
+        box.onclick = () => openPopup(verse);
         resultsArea.appendChild(box);
     });
     
@@ -161,12 +163,50 @@ function performSearch(query) {
     }
 }
 
-// --- Popup & Legal Logic ---
+// --- Popup & Chapter Logic ---
 
-function openPopup(title, text) {
-    modalRef.innerText = title; // This is now JUST "1 Nephi 1:5"
-    modalText.innerText = text; // This is the scripture text
+function openPopup(verseOrTitle, textIfRef) {
     modalOverlay.classList.remove('hidden');
+    modalFooter.innerHTML = ''; // Clear previous buttons
+    
+    // Check if called with just text (Legal link) or a Verse Object
+    if (typeof verseOrTitle === 'string') {
+        // Simple View (Legal Text)
+        modalRef.innerText = verseOrTitle;
+        modalText.innerText = textIfRef;
+        return;
+    }
+
+    // Verse View
+    const verse = verseOrTitle;
+    modalRef.innerText = verse.ref;
+    modalText.innerText = verse.text;
+    modalText.scrollTop = 0; // Reset scroll
+
+    // Create "View Chapter" Button
+    const chapterBtn = document.createElement('button');
+    chapterBtn.className = 'action-btn';
+    chapterBtn.innerText = `View Chapter (${verse.chapterId})`;
+    chapterBtn.onclick = () => viewChapter(verse.chapterId);
+    
+    modalFooter.appendChild(chapterBtn);
+}
+
+function viewChapter(chapterId) {
+    // 1. Find all verses in this chapter
+    const chapterVerses = allVerses.filter(v => v.chapterId === chapterId);
+    
+    // 2. Combine them (Double newline for spacing)
+    // We do NOT include the reference, just the text.
+    const fullText = chapterVerses.map(v => v.text).join('\n\n');
+
+    // 3. Update Modal
+    modalRef.innerText = chapterId; // Title becomes "2 Nephi 2"
+    modalText.innerText = fullText;
+    modalText.scrollTop = 0;
+
+    // 4. Clear the footer (remove the button since we are already viewing the chapter)
+    modalFooter.innerHTML = '';
 }
 
 if(legalLink) {
