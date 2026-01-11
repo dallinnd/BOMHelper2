@@ -1,0 +1,20 @@
+{
+  "name": "Your Book of Mormon Helper",
+  "short_name": "BoM Helper",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "icons": [
+    {
+      "src": "https://via.placeholder.com/192/2563eb/ffffff?text=BoM",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://via.placeholder.com/512/2563eb/ffffff?text=BoM",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
