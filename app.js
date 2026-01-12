@@ -1,9 +1,7 @@
 // Global State
 let allVerses = [];
 let uniqueWords = [];
-let chapterList = []; 
 let legalTextContent = ""; 
-let currentChapterIndex = -1; 
 const BIBLE_URL = 'bom.txt';
 
 // DOM Elements
@@ -12,26 +10,18 @@ const sendBtn = document.getElementById('send-btn');
 const suggestionsArea = document.getElementById('suggestions-area');
 const resultsArea = document.getElementById('results-area');
 const modalOverlay = document.getElementById('modal-overlay');
-const modalContent = document.querySelector('.modal-content');
 const modalText = document.getElementById('modal-text');
 const modalRef = document.querySelector('.modal-ref');
 const closeBtn = document.querySelector('.close-btn');
 const legalLink = document.getElementById('legal-link');
-const modalFooter = document.querySelector('.modal-footer') || createModalFooter();
-const prevBtn = document.getElementById('prev-chapter-btn');
-const nextBtn = document.getElementById('next-chapter-btn');
-
-function createModalFooter() {
-    const f = document.createElement('div');
-    f.className = 'modal-footer';
-    document.querySelector('.modal-content').appendChild(f);
-    return f;
-}
+// New Element for the button container in the modal
+const modalFooter = document.createElement('div');
+modalFooter.className = 'modal-footer';
+document.querySelector('.modal-content').appendChild(modalFooter);
 
 // --- Initialization ---
 document.addEventListener('DOMContentLoaded', async () => {
-    // Version v8 forces reload for the new filtering logic
-    const savedData = localStorage.getItem('bom_data_v8'); 
+    const savedData = localStorage.getItem('bom_data_v6'); // Bump to v6
     
     if (savedData) {
         try {
@@ -39,7 +29,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             allVerses = parsed.verses;
             uniqueWords = parsed.words;
             legalTextContent = parsed.legal;
-            chapterList = parsed.chapters || []; 
             updateStatus("Ready to search.");
             return; 
         } catch (e) { console.warn("Saved data corrupt, reloading..."); }
@@ -56,7 +45,7 @@ async function loadAndParseText() {
     updateStatus("Downloading scripture file...");
     try {
         const response = await fetch(BIBLE_URL);
-        if (!response.ok) throw new Error("File not found.");
+        if (!response.ok) throw new Error("File not found or network error.");
         const fullText = await response.text();
 
         const allLines = fullText.split(/\r?\n/);
@@ -66,21 +55,17 @@ async function loadAndParseText() {
         const rawParagraphs = rawScriptureText.split(/\n\s*\n/);
         
         const tempWords = new Set();
-        const tempChapters = new Set();
         allVerses = []; 
 
         rawParagraphs.forEach((para, index) => {
             let cleanPara = para.trim();
             if (cleanPara.length < 5) return;
 
-            // --- NOISE FILTER ---
-            // 1. Skip lines that are just "Chapter X"
-            if (/^chapter\s+\d+$/i.test(cleanPara)) return;
-
             const lines = cleanPara.split('\n');
             let reference = "";
             let textContent = cleanPara;
 
+            // Logic to find Reference and separate it from Text
             if (lines.length > 1 && lines[0].length < 50 && /\d+[:]\d+/.test(lines[0])) {
                 reference = lines[0].trim(); 
                 textContent = lines.slice(1).join(' ').trim(); 
@@ -88,25 +73,20 @@ async function loadAndParseText() {
                 reference = cleanPara.substring(0, 30).trim() + "...";
             }
 
-            // --- NOISE FILTER 2 ---
-            // 2. If the text body matches the reference (e.g. "1 Nephi 8" body matches "1 Nephi 8" ref)
-            // This happens when the file repeats headers
-            if (textContent.trim().toLowerCase() === reference.split(':')[0].toLowerCase().trim()) return;
-
-            // Chapter ID Logic
+            // --- NEW: Generate Chapter ID ---
+            // If reference is "1 Nephi 3:7", chapterId becomes "1 Nephi 3"
             let chapterId = "Unknown";
             if (reference.includes(":")) {
                 chapterId = reference.split(":")[0].trim();
             } else {
-                chapterId = reference; 
+                chapterId = reference; // Fallback
             }
-            tempChapters.add(chapterId);
 
             allVerses.push({ 
                 id: index, 
                 ref: reference,  
                 text: textContent,
-                chapterId: chapterId 
+                chapterId: chapterId // Store this for the chapter view
             });
 
             const words = textContent.toLowerCase().match(/\b[a-z]{3,}\b/g);
@@ -114,13 +94,11 @@ async function loadAndParseText() {
         });
 
         uniqueWords = Array.from(tempWords).sort();
-        chapterList = Array.from(tempChapters); 
 
-        localStorage.setItem('bom_data_v8', JSON.stringify({
+        localStorage.setItem('bom_data_v6', JSON.stringify({
             verses: allVerses,
             words: uniqueWords,
-            legal: legalTextContent,
-            chapters: chapterList
+            legal: legalTextContent
         }));
 
         updateStatus("Ready to search.");
@@ -172,6 +150,7 @@ function performSearch(query) {
             <span class="verse-ref">${verse.ref}</span>
             <div class="verse-snippet">${snippet}</div>
         `;
+        // Pass the whole verse object now
         box.onclick = () => openPopup(verse);
         resultsArea.appendChild(box);
     });
@@ -184,27 +163,27 @@ function performSearch(query) {
     }
 }
 
-// --- Popup & Navigation Logic ---
+// --- Popup & Chapter Logic ---
 
 function openPopup(verseOrTitle, textIfRef) {
     modalOverlay.classList.remove('hidden');
-    modalFooter.innerHTML = '';
+    modalFooter.innerHTML = ''; // Clear previous buttons
     
-    // Hide Arrows initially
-    prevBtn.classList.add('hidden');
-    nextBtn.classList.add('hidden');
-    
+    // Check if called with just text (Legal link) or a Verse Object
     if (typeof verseOrTitle === 'string') {
+        // Simple View (Legal Text)
         modalRef.innerText = verseOrTitle;
         modalText.innerText = textIfRef;
         return;
     }
 
+    // Verse View
     const verse = verseOrTitle;
     modalRef.innerText = verse.ref;
     modalText.innerText = verse.text;
-    modalText.scrollTop = 0;
+    modalText.scrollTop = 0; // Reset scroll
 
+    // Create "View Chapter" Button
     const chapterBtn = document.createElement('button');
     chapterBtn.className = 'action-btn';
     chapterBtn.innerText = `View Chapter (${verse.chapterId})`;
@@ -214,85 +193,29 @@ function openPopup(verseOrTitle, textIfRef) {
 }
 
 function viewChapter(chapterId) {
-    currentChapterIndex = chapterList.indexOf(chapterId);
-    if (currentChapterIndex === -1) return;
+    // 1. Find all verses in this chapter
+    const chapterVerses = allVerses.filter(v => v.chapterId === chapterId);
+    
+    // 2. Combine them (Double newline for spacing)
+    // We do NOT include the reference, just the text.
+    const fullText = chapterVerses.map(v => v.text).join('\n\n');
 
-    loadChapterContent(chapterId);
+    // 3. Update Modal
+    modalRef.innerText = chapterId; // Title becomes "2 Nephi 2"
+    modalText.innerText = fullText;
+    modalText.scrollTop = 0;
 
-    // Show Arrows
-    prevBtn.classList.remove('hidden');
-    nextBtn.classList.remove('hidden');
-
-    updateNavButtons();
+    // 4. Clear the footer (remove the button since we are already viewing the chapter)
     modalFooter.innerHTML = '';
 }
 
-function loadChapterContent(chapterId) {
-    const chapterVerses = allVerses.filter(v => v.chapterId === chapterId);
-    
-    const fullText = chapterVerses.map(v => {
-        const verseNum = v.ref.includes(':') ? v.ref.split(':')[1] : '';
-        return verseNum ? `<b>${verseNum}</b> ${v.text}` : v.text;
-    }).join('\n\n');
-
-    modalRef.innerText = chapterId;
-    modalText.innerHTML = fullText;
-    modalText.scrollTop = 0;
-}
-
-function updateNavButtons() {
-    prevBtn.style.opacity = currentChapterIndex <= 0 ? '0.3' : '1';
-    nextBtn.style.opacity = currentChapterIndex >= chapterList.length - 1 ? '0.3' : '1';
-}
-
-function navigateChapter(direction) {
-    const newIndex = currentChapterIndex + direction;
-    if (newIndex >= 0 && newIndex < chapterList.length) {
-        currentChapterIndex = newIndex;
-        const newChapterId = chapterList[newIndex];
-        
-        modalText.style.opacity = 0;
-        setTimeout(() => {
-            loadChapterContent(newChapterId);
-            updateNavButtons();
-            modalText.style.opacity = 1;
-        }, 150);
-    }
-}
-
-prevBtn.onclick = () => navigateChapter(-1);
-nextBtn.onclick = () => navigateChapter(1);
-
-// Swipe Gestures
-let touchStartX = 0;
-let touchEndX = 0;
-
-modalContent.addEventListener('touchstart', (e) => {
-    touchStartX = e.changedTouches[0].screenX;
-}, {passive: true});
-
-modalContent.addEventListener('touchend', (e) => {
-    touchEndX = e.changedTouches[0].screenX;
-    handleSwipe();
-}, {passive: true});
-
-function handleSwipe() {
-    if (nextBtn.classList.contains('hidden')) return;
-
-    const threshold = 50; 
-    const swipeDistance = touchStartX - touchEndX;
-
-    if (swipeDistance > threshold) navigateChapter(1);
-    else if (swipeDistance < -threshold) navigateChapter(-1);
-}
-
-// Close Logic
 if(legalLink) {
     legalLink.onclick = (e) => {
         e.preventDefault();
         openPopup("Legal Disclosure", legalTextContent || "Loading...");
     };
 }
+
 function closePopup() { modalOverlay.classList.add('hidden'); }
 closeBtn.onclick = closePopup;
 modalOverlay.addEventListener('click', (e) => { if (e.target === modalOverlay) closePopup(); });
