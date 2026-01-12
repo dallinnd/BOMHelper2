@@ -56,12 +56,11 @@ input[type="text"]:focus { border-color: var(--primary); box-shadow: 0 0 0 3px r
 .verse-ref { font-weight: 700; color: var(--primary); font-size: 0.85rem; margin-bottom: 6px; display: block; }
 .verse-snippet { color: var(--text-light); font-size: 0.95rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 
-/* Footer */
 footer { padding: 15px; text-align: center; border-top: 1px solid var(--border); background: var(--bg); }
 #legal-link { font-size: 0.8rem; color: var(--text-light); text-decoration: none; }
 #legal-link:hover { text-decoration: underline; }
 
-/* Modal Popup */
+/* Modal Popup - UPDATED HEIGHT */
 .modal-overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000;
   display: flex; align-items: center; justify-content: center;
@@ -70,32 +69,45 @@ footer { padding: 15px; text-align: center; border-top: 1px solid var(--border);
 .modal-overlay.hidden { opacity: 0; pointer-events: none; }
 
 .modal-content {
-  background: white; width: 90%; max-width: 500px; height: 60vh; /* Made slightly taller */
-  border-radius: 24px; display: flex; flex-direction: column;
+  background: white; width: 95%; max-width: 600px; 
+  height: 90vh; /* FULL HEIGHT */
+  border-radius: 20px; display: flex; flex-direction: column;
   box-shadow: 0 20px 50px rgba(0,0,0,0.2); transform: translateY(0); transition: transform 0.3s;
 }
 .modal-overlay.hidden .modal-content { transform: translateY(20px); }
 
+/* Header Layout */
 .modal-header {
-  padding: 15px 20px; border-bottom: 1px solid var(--border);
-  display: flex; justify-content: center; align-items: center; position: relative;
+  padding: 15px 10px; border-bottom: 1px solid var(--border);
+  display: flex; justify-content: center; align-items: center; 
+  position: relative; gap: 15px;
 }
-.modal-ref { font-weight: 600; color: var(--text-light); font-size: 1rem; text-align: center; }
+
+.modal-ref { 
+  font-weight: 700; color: var(--text); font-size: 1.1rem; text-align: center; flex: 1; 
+}
+
+/* Nav Arrows */
+.nav-arrow {
+  background: none; border: none; font-size: 1.5rem; color: var(--primary);
+  cursor: pointer; padding: 0 10px; font-weight: bold;
+}
+.nav-arrow.hidden { visibility: hidden; pointer-events: none; }
+
 .close-btn { 
-  position: absolute; right: 15px; top: 12px;
-  background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-light); 
+  background: none; border: none; font-size: 1.8rem; cursor: pointer; color: var(--text-light); 
+  position: absolute; right: 15px; /* Absolute to keep it out of the flex flow */
 }
 
 .modal-body {
   padding: 25px; overflow-y: auto; flex: 1;
   font-size: 1.15rem; line-height: 1.6; color: var(--text);
-  white-space: pre-wrap;
+  white-space: pre-wrap; transition: opacity 0.2s;
 }
 
-/* Modal Footer (Action Buttons) */
 .modal-footer {
   padding: 15px 20px; border-top: 1px solid var(--border);
-  display: flex; justify-content: center;
+  display: flex; justify-content: center; min-height: 60px;
 }
 
 .action-btn {
@@ -104,4 +116,3 @@ footer { padding: 15px; text-align: center; border-top: 1px solid var(--border);
   cursor: pointer; transition: 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.05);
 }
 .action-btn:hover { background: var(--bg); border-color: var(--primary); }
-.action-btn:active { transform: scale(0.96); }
