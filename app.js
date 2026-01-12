@@ -1,7 +1,9 @@
 // Global State
 let allVerses = [];
 let uniqueWords = [];
+let chapterList = []; // Ordered list of unique Chapter IDs (e.g. ["1 Nephi 1", "1 Nephi 2"...])
 let legalTextContent = ""; 
+let currentChapterIndex = -1; // Tracks where we are for next/prev logic
 const BIBLE_URL = 'bom.txt';
 
 // DOM Elements
@@ -10,18 +12,26 @@ const sendBtn = document.getElementById('send-btn');
 const suggestionsArea = document.getElementById('suggestions-area');
 const resultsArea = document.getElementById('results-area');
 const modalOverlay = document.getElementById('modal-overlay');
+const modalContent = document.querySelector('.modal-content');
 const modalText = document.getElementById('modal-text');
 const modalRef = document.querySelector('.modal-ref');
 const closeBtn = document.querySelector('.close-btn');
 const legalLink = document.getElementById('legal-link');
-// New Element for the button container in the modal
-const modalFooter = document.createElement('div');
-modalFooter.className = 'modal-footer';
-document.querySelector('.modal-content').appendChild(modalFooter);
+const modalFooter = document.querySelector('.modal-footer') || createModalFooter();
+const prevBtn = document.getElementById('prev-chapter-btn');
+const nextBtn = document.getElementById('next-chapter-btn');
+
+// Helper to create footer if missing (legacy check)
+function createModalFooter() {
+    const f = document.createElement('div');
+    f.className = 'modal-footer';
+    document.querySelector('.modal-content').appendChild(f);
+    return f;
+}
 
 // --- Initialization ---
 document.addEventListener('DOMContentLoaded', async () => {
-    const savedData = localStorage.getItem('bom_data_v6'); // Bump to v6
+    const savedData = localStorage.getItem('bom_data_v7'); 
     
     if (savedData) {
         try {
@@ -29,6 +39,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             allVerses = parsed.verses;
             uniqueWords = parsed.words;
             legalTextContent = parsed.legal;
+            chapterList = parsed.chapters || []; 
             updateStatus("Ready to search.");
             return; 
         } catch (e) { console.warn("Saved data corrupt, reloading..."); }
@@ -45,7 +56,7 @@ async function loadAndParseText() {
     updateStatus("Downloading scripture file...");
     try {
         const response = await fetch(BIBLE_URL);
-        if (!response.ok) throw new Error("File not found or network error.");
+        if (!response.ok) throw new Error("File not found.");
         const fullText = await response.text();
 
         const allLines = fullText.split(/\r?\n/);
@@ -55,6 +66,7 @@ async function loadAndParseText() {
         const rawParagraphs = rawScriptureText.split(/\n\s*\n/);
         
         const tempWords = new Set();
+        const tempChapters = new Set();
         allVerses = []; 
 
         rawParagraphs.forEach((para, index) => {
@@ -65,7 +77,6 @@ async function loadAndParseText() {
             let reference = "";
             let textContent = cleanPara;
 
-            // Logic to find Reference and separate it from Text
             if (lines.length > 1 && lines[0].length < 50 && /\d+[:]\d+/.test(lines[0])) {
                 reference = lines[0].trim(); 
                 textContent = lines.slice(1).join(' ').trim(); 
@@ -73,20 +84,20 @@ async function loadAndParseText() {
                 reference = cleanPara.substring(0, 30).trim() + "...";
             }
 
-            // --- NEW: Generate Chapter ID ---
-            // If reference is "1 Nephi 3:7", chapterId becomes "1 Nephi 3"
+            // Chapter ID Logic
             let chapterId = "Unknown";
             if (reference.includes(":")) {
                 chapterId = reference.split(":")[0].trim();
             } else {
-                chapterId = reference; // Fallback
+                chapterId = reference; 
             }
+            tempChapters.add(chapterId);
 
             allVerses.push({ 
                 id: index, 
                 ref: reference,  
                 text: textContent,
-                chapterId: chapterId // Store this for the chapter view
+                chapterId: chapterId 
             });
 
             const words = textContent.toLowerCase().match(/\b[a-z]{3,}\b/g);
@@ -94,11 +105,13 @@ async function loadAndParseText() {
         });
 
         uniqueWords = Array.from(tempWords).sort();
+        chapterList = Array.from(tempChapters); // Create ordered list of chapters
 
-        localStorage.setItem('bom_data_v6', JSON.stringify({
+        localStorage.setItem('bom_data_v7', JSON.stringify({
             verses: allVerses,
             words: uniqueWords,
-            legal: legalTextContent
+            legal: legalTextContent,
+            chapters: chapterList
         }));
 
         updateStatus("Ready to search.");
@@ -150,7 +163,6 @@ function performSearch(query) {
             <span class="verse-ref">${verse.ref}</span>
             <div class="verse-snippet">${snippet}</div>
         `;
-        // Pass the whole verse object now
         box.onclick = () => openPopup(verse);
         resultsArea.appendChild(box);
     });
@@ -163,27 +175,27 @@ function performSearch(query) {
     }
 }
 
-// --- Popup & Chapter Logic ---
+// --- Popup & Navigation Logic ---
 
 function openPopup(verseOrTitle, textIfRef) {
     modalOverlay.classList.remove('hidden');
-    modalFooter.innerHTML = ''; // Clear previous buttons
+    modalFooter.innerHTML = '';
     
-    // Check if called with just text (Legal link) or a Verse Object
+    // Hide Navigation Arrows initially (only show in Chapter View)
+    prevBtn.classList.add('hidden');
+    nextBtn.classList.add('hidden');
+    
     if (typeof verseOrTitle === 'string') {
-        // Simple View (Legal Text)
         modalRef.innerText = verseOrTitle;
         modalText.innerText = textIfRef;
         return;
     }
 
-    // Verse View
     const verse = verseOrTitle;
     modalRef.innerText = verse.ref;
     modalText.innerText = verse.text;
-    modalText.scrollTop = 0; // Reset scroll
+    modalText.scrollTop = 0;
 
-    // Create "View Chapter" Button
     const chapterBtn = document.createElement('button');
     chapterBtn.className = 'action-btn';
     chapterBtn.innerText = `View Chapter (${verse.chapterId})`;
@@ -193,29 +205,103 @@ function openPopup(verseOrTitle, textIfRef) {
 }
 
 function viewChapter(chapterId) {
-    // 1. Find all verses in this chapter
-    const chapterVerses = allVerses.filter(v => v.chapterId === chapterId);
+    // 1. Find index
+    currentChapterIndex = chapterList.indexOf(chapterId);
     
-    // 2. Combine them (Double newline for spacing)
-    // We do NOT include the reference, just the text.
-    const fullText = chapterVerses.map(v => v.text).join('\n\n');
+    if (currentChapterIndex === -1) return;
 
-    // 3. Update Modal
-    modalRef.innerText = chapterId; // Title becomes "2 Nephi 2"
-    modalText.innerText = fullText;
-    modalText.scrollTop = 0;
+    // 2. Load Content
+    loadChapterContent(chapterId);
 
-    // 4. Clear the footer (remove the button since we are already viewing the chapter)
+    // 3. Show Navigation Arrows
+    prevBtn.classList.remove('hidden');
+    nextBtn.classList.remove('hidden');
+
+    // 4. Update Header State
+    updateNavButtons();
+
+    // 5. Clear footer (remove "View Chapter" button)
     modalFooter.innerHTML = '';
 }
 
+function loadChapterContent(chapterId) {
+    const chapterVerses = allVerses.filter(v => v.chapterId === chapterId);
+    // Combine text with verse numbers if desired, or just text.
+    // Here we add verse numbers back for clarity in block reading
+    const fullText = chapterVerses.map(v => {
+        // Extract verse number from Ref if possible (e.g. "1:5" -> "5")
+        const verseNum = v.ref.includes(':') ? v.ref.split(':')[1] : '';
+        return verseNum ? `<b>${verseNum}</b> ${v.text}` : v.text;
+    }).join('\n\n');
+
+    modalRef.innerText = chapterId;
+    modalText.innerHTML = fullText; // Use innerHTML to render bold numbers
+    modalText.scrollTop = 0;
+}
+
+function updateNavButtons() {
+    // Disable/Hide arrows if at start or end
+    prevBtn.style.opacity = currentChapterIndex <= 0 ? '0.3' : '1';
+    nextBtn.style.opacity = currentChapterIndex >= chapterList.length - 1 ? '0.3' : '1';
+}
+
+function navigateChapter(direction) {
+    const newIndex = currentChapterIndex + direction;
+    
+    if (newIndex >= 0 && newIndex < chapterList.length) {
+        currentChapterIndex = newIndex;
+        const newChapterId = chapterList[newIndex];
+        
+        // Add a small fade animation effect
+        modalText.style.opacity = 0;
+        setTimeout(() => {
+            loadChapterContent(newChapterId);
+            updateNavButtons();
+            modalText.style.opacity = 1;
+        }, 150);
+    }
+}
+
+// Button Listeners
+prevBtn.onclick = () => navigateChapter(-1);
+nextBtn.onclick = () => navigateChapter(1);
+
+// --- Swipe Gestures ---
+let touchStartX = 0;
+let touchEndX = 0;
+
+modalContent.addEventListener('touchstart', (e) => {
+    touchStartX = e.changedTouches[0].screenX;
+}, {passive: true});
+
+modalContent.addEventListener('touchend', (e) => {
+    touchEndX = e.changedTouches[0].screenX;
+    handleSwipe();
+}, {passive: true});
+
+function handleSwipe() {
+    // Ensure we are in Chapter View (arrows are visible)
+    if (nextBtn.classList.contains('hidden')) return;
+
+    const threshold = 50; // min distance to count as swipe
+    const swipeDistance = touchStartX - touchEndX;
+
+    if (swipeDistance > threshold) {
+        // Swiped Left -> Next Chapter
+        navigateChapter(1);
+    } else if (swipeDistance < -threshold) {
+        // Swiped Right -> Prev Chapter
+        navigateChapter(-1);
+    }
+}
+
+// --- Close Logic ---
 if(legalLink) {
     legalLink.onclick = (e) => {
         e.preventDefault();
         openPopup("Legal Disclosure", legalTextContent || "Loading...");
     };
 }
-
 function closePopup() { modalOverlay.classList.add('hidden'); }
 closeBtn.onclick = closePopup;
 modalOverlay.addEventListener('click', (e) => { if (e.target === modalOverlay) closePopup(); });
