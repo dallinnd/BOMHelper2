@@ -60,7 +60,7 @@ footer { padding: 15px; text-align: center; border-top: 1px solid var(--border);
 #legal-link { font-size: 0.8rem; color: var(--text-light); text-decoration: none; }
 #legal-link:hover { text-decoration: underline; }
 
-/* Modal Popup - UPDATED HEIGHT */
+/* Modal Popup */
 .modal-overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000;
   display: flex; align-items: center; justify-content: center;
@@ -76,27 +76,34 @@ footer { padding: 15px; text-align: center; border-top: 1px solid var(--border);
 }
 .modal-overlay.hidden .modal-content { transform: translateY(20px); }
 
-/* Header Layout */
+/* Updated Header Layout */
 .modal-header {
-  padding: 15px 10px; border-bottom: 1px solid var(--border);
-  display: flex; justify-content: center; align-items: center; 
-  position: relative; gap: 15px;
+  padding: 15px 20px; border-bottom: 1px solid var(--border);
+  display: flex; justify-content: space-between; /* Push items to edges */
+  align-items: center;
+}
+
+.header-left {
+  display: flex; align-items: center; gap: 10px; flex: 1;
 }
 
 .modal-ref { 
-  font-weight: 700; color: var(--text); font-size: 1.1rem; text-align: center; flex: 1; 
+  font-weight: 700; color: var(--text); font-size: 1.1rem; 
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
-/* Nav Arrows */
 .nav-arrow {
-  background: none; border: none; font-size: 1.5rem; color: var(--primary);
-  cursor: pointer; padding: 0 10px; font-weight: bold;
+  background: var(--bg); border: 1px solid var(--border); 
+  width: 32px; height: 32px; border-radius: 50%;
+  font-size: 1.2rem; color: var(--primary); display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: 0.2s; font-weight: bold; flex-shrink: 0;
 }
-.nav-arrow.hidden { visibility: hidden; pointer-events: none; }
+.nav-arrow:hover { background: var(--border); }
+.nav-arrow.hidden { display: none; }
 
 .close-btn { 
-  background: none; border: none; font-size: 1.8rem; cursor: pointer; color: var(--text-light); 
-  position: absolute; right: 15px; /* Absolute to keep it out of the flex flow */
+  background: none; border: none; font-size: 2rem; cursor: pointer; color: var(--text-light); 
+  padding: 0; line-height: 1;
 }
 
 .modal-body {
